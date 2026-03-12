@@ -1,0 +1,114 @@
+// =========================================================
+// SCORING & SET LOGIC
+// =========================================================
+
+function changeScore(matchId, teamKey, delta) {
+    if (!isScorer) return;
+    var m = matchData[matchId]; if (!m) return;
+    if (delta === 0) return;
+
+    if (delta > 0) {
+        // Block scoring after match is complete
+        if (m.matchComplete) {
+            alert("Match is complete. No more points can be scored.");
+            return;
+        }
+
+        if (!m.rallyHistory) m.rallyHistory = [];
+        m.rallyHistory.push({
+            scoringTeam: teamKey,
+            prevScoreA: m.scoreA,
+            prevScoreB: m.scoreB,
+            prevRotationA: (m.rotationA || []).slice(),
+            prevRotationB: (m.rotationB || []).slice(),
+            prevServerTeam: m.serverTeam,
+            prevServerPlayerA: m.serverPlayerA,
+            prevServerPlayerB: m.serverPlayerB,
+            prevRallyCounter: m.rallyCounter,
+            prevCurrentSet: m.currentSet || 1,
+            prevSetsWonA: m.setsWonA || 0,
+            prevSetsWonB: m.setsWonB || 0,
+            prevSets: (m.sets || []).slice(),
+            prevMatchComplete: m.matchComplete || false
+        });
+        if (teamKey === "A") m.scoreA += delta; else m.scoreB += delta;
+        m.rallyCounter += 1;
+        logServiceEvent(matchId, teamKey);
+        if (autoRotate && m.serverTeam && m.serverTeam !== teamKey) {
+            manualRotateInternal(matchId, teamKey);
+        }
+        checkSetComplete(matchId);
+    } else {
+        undoLastPoint(matchId, teamKey);
+        return;
+    }
+
+    refreshScoreUI(matchId);
+    renderRotation(matchId, "A");
+    renderRotation(matchId, "B");
+    updateStandings();
+    renderServiceLogTable(matchId);
+    saveToFirebase();
+}
+
+// Check if the current set is complete and advance if so.
+// A set ends when one team reaches 15+ points with a 2+ point lead.
+function checkSetComplete(matchId) {
+    var m = matchData[matchId]; if (!m) return;
+    var a = m.scoreA, b = m.scoreB;
+    var diff = Math.abs(a - b);
+    if (!((a >= 15 || b >= 15) && diff >= 2)) return;
+
+    var winner = (a > b) ? "A" : "B";
+    m.sets = m.sets || [];
+    m.sets.push({ scoreA: a, scoreB: b });
+    if (winner === "A") m.setsWonA = (m.setsWonA || 0) + 1;
+    else m.setsWonB = (m.setsWonB || 0) + 1;
+
+    // Match ends when one team wins 2 sets
+    if (m.setsWonA >= 2 || m.setsWonB >= 2) {
+        m.matchComplete = true;
+        return;
+    }
+
+    // Start next set
+    m.currentSet = (m.currentSet || 1) + 1;
+    m.scoreA = 0;
+    m.scoreB = 0;
+    m.rallyHistory = [];
+}
+
+function undoLastPoint(matchId, teamKey) {
+    if (!isScorer) return;
+    var m = matchData[matchId]; if (!m) return;
+    var history = m.rallyHistory || [];
+    if (!history.length) return;
+    var last = history[history.length - 1];
+    if (teamKey && last.scoringTeam !== teamKey) {
+        alert("Most recent point belongs to the other team. Undo that side first.");
+        return;
+    }
+    history.pop();
+    m.scoreA = last.prevScoreA;
+    m.scoreB = last.prevScoreB;
+    m.rotationA = last.prevRotationA;
+    m.rotationB = last.prevRotationB;
+    m.serverTeam = last.prevServerTeam;
+    m.serverPlayerA = last.prevServerPlayerA;
+    m.serverPlayerB = last.prevServerPlayerB;
+    m.rallyCounter = last.prevRallyCounter;
+    if (m.serviceLog && m.serviceLog.length) m.serviceLog.pop();
+    if (last.prevCurrentSet !== undefined) m.currentSet = last.prevCurrentSet;
+    if (last.prevSetsWonA !== undefined) m.setsWonA = last.prevSetsWonA;
+    if (last.prevSetsWonB !== undefined) m.setsWonB = last.prevSetsWonB;
+    if (last.prevSets !== undefined) m.sets = last.prevSets;
+    if (last.prevMatchComplete !== undefined) m.matchComplete = last.prevMatchComplete;
+
+    refreshScoreUI(matchId);
+    renderRotation(matchId, "A");
+    renderRotation(matchId, "B");
+    highlightServerButton(matchId);
+    updateStandings();
+    renderServiceLogTable(matchId);
+    saveToFirebase();
+}
