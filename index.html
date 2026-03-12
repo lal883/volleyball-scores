@@ -368,16 +368,19 @@
         /* Substitution UI */
         .sub-court-player {
             display: inline-block;
-            padding: 4px 10px;
-            margin: 3px 3px 0 0;
+            padding: 8px 14px;
+            margin: 4px 4px 0 0;
             background: var(--surface2);
             border: 1px solid var(--border);
             border-radius: 999px;
             cursor: pointer;
-            font-size: 0.72rem;
+            font-size: 0.82rem;
             font-family: var(--mono);
             color: var(--text-dim);
             transition: all 0.15s;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
         }
 
         .sub-court-player:hover {
@@ -394,16 +397,19 @@
 
         .sub-bench-player {
             display: inline-block;
-            padding: 4px 10px;
-            margin: 3px 3px 0 0;
+            padding: 8px 14px;
+            margin: 4px 4px 0 0;
             background: rgba(34, 197, 94, 0.08);
             border: 1px solid var(--green);
             border-radius: 999px;
             cursor: pointer;
-            font-size: 0.72rem;
+            font-size: 0.82rem;
             font-family: var(--mono);
             color: var(--green);
             transition: all 0.15s;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
         }
 
         .sub-bench-player:hover {
@@ -1186,7 +1192,7 @@
                 renderRotation(matchId, "A");
                 renderRotation(matchId, "B");
                 refreshScoreUI(matchId);
-                highlightServerButton(matchId);
+                renderServerButtons(matchId);
                 renderServiceLogTable(matchId);
 
                 // Render substitution panels (scorer-interactive)
@@ -1238,7 +1244,7 @@
                     renderRotation(FINAL_MATCH_ID, "A");
                     renderRotation(FINAL_MATCH_ID, "B");
                     refreshScoreUI(FINAL_MATCH_ID);
-                    highlightServerButton(FINAL_MATCH_ID);
+                    renderServerButtons(FINAL_MATCH_ID);
                     renderServiceLogTable(FINAL_MATCH_ID);
                 }
             }
@@ -1404,16 +1410,7 @@
                 "Final: " + escHtml(t1.name) + " vs " + escHtml(t2.name) :
                 "Match " + (parseInt(matchId.replace(LEAGUE_PREFIX, ""), 10) + 1) + ": " + escHtml(t1.name) + " vs " + escHtml(t2.name);
 
-            // Server buttons
-            var srvA = playersA.map(function (p) {
-                var sid = "srv_" + matchId + "_A_" + safeId(p);
-                return "<span id='" + sid + "' class='player-btn scorer-only' onclick=\"setServer('" + matchId + "','A','" + escJs(p) + "')\">" + escHtml(p) + "</span>";
-            }).join("");
-
-            var srvB = playersB.map(function (p) {
-                var sid = "srv_" + matchId + "_B_" + safeId(p);
-                return "<span id='" + sid + "' class='player-btn scorer-only' onclick=\"setServer('" + matchId + "','B','" + escJs(p) + "')\">" + escHtml(p) + "</span>";
-            }).join("");
+            // Server buttons are built dynamically via renderServerButtons()
 
             // Sub buttons are built dynamically via updateSubUI() — not inline HTML.
 
@@ -1463,11 +1460,11 @@
                 "    <button class='btn-rotate scorer-only' onclick=\"manualRotate('" + matchId + "','B')\">↻ Rotate</button>" +
                 "  </div>" +
 
-                // Server selection (scorer only)
+                // Server selection (scorer only) — populated by renderServerButtons()
                 "  <div class='scorer-only mt-16'>" +
                 "    <div class='section-title'>Choose Server</div>" +
-                "    <div class='mt-6'><strong style='font-size:0.8rem;'>" + escHtml(t1.name) + ":</strong><br/>" + srvA + "</div>" +
-                "    <div class='mt-6'><strong style='font-size:0.8rem;'>" + escHtml(t2.name) + ":</strong><br/>" + srvB + "</div>" +
+                "    <div class='mt-6'><strong style='font-size:0.8rem;'>" + escHtml(t1.name) + ":</strong><br/><span id='srvContainer_" + matchId + "_A'></span></div>" +
+                "    <div class='mt-6'><strong style='font-size:0.8rem;'>" + escHtml(t2.name) + ":</strong><br/><span id='srvContainer_" + matchId + "_B'></span></div>" +
                 "  </div>" +
 
                 // Substitutions — panels are populated dynamically by updateSubUI()
@@ -1599,6 +1596,32 @@
             saveToFirebase();
         }
 
+        // Render server-selection buttons using the active (possibly substituted) roster.
+        function renderServerButtons(matchId) {
+            var m = matchData[matchId]; if (!m) return;
+            ensureActivePlayers(matchId);
+            var t1 = teams[m.team1Index], t2 = teams[m.team2Index];
+            var playersA = m.activePlayersA || t1.players || [];
+            var playersB = m.activePlayersB || t2.players || [];
+
+            var containerA = document.getElementById("srvContainer_" + matchId + "_A");
+            var containerB = document.getElementById("srvContainer_" + matchId + "_B");
+
+            if (containerA) {
+                containerA.innerHTML = playersA.map(function (p) {
+                    var sid = "srv_" + matchId + "_A_" + safeId(p);
+                    return "<span id='" + sid + "' class='player-btn' onclick=\"setServer('" + matchId + "','A','" + escJs(p) + "')\">" + escHtml(p) + "</span>";
+                }).join("");
+            }
+            if (containerB) {
+                containerB.innerHTML = playersB.map(function (p) {
+                    var sid = "srv_" + matchId + "_B_" + safeId(p);
+                    return "<span id='" + sid + "' class='player-btn' onclick=\"setServer('" + matchId + "','B','" + escJs(p) + "')\">" + escHtml(p) + "</span>";
+                }).join("");
+            }
+            highlightServerButton(matchId);
+        }
+
         function highlightServerButton(matchId) {
             var m = matchData[matchId]; if (!m) return;
             var t1 = teams[m.team1Index], t2 = teams[m.team2Index];
@@ -1697,7 +1720,7 @@
 
             renderRotation(matchId, teamKey);
             updateSubUI(matchId, teamKey);
-            highlightServerButton(matchId);
+            renderServerButtons(matchId);
             saveToFirebase();
         }
 
@@ -1863,6 +1886,7 @@
 
             renderRotation(FINAL_MATCH_ID, "A");
             renderRotation(FINAL_MATCH_ID, "B");
+            renderServerButtons(FINAL_MATCH_ID);
             renderServiceLogTable(FINAL_MATCH_ID);
             saveToFirebase();
         }
