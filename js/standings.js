@@ -17,8 +17,13 @@ function getStandingsData() {
             totalPointsA += setScore.scoreA || 0;
             totalPointsB += setScore.scoreB || 0;
         });
-        totalPointsA += m.scoreA || 0;
-        totalPointsB += m.scoreB || 0;
+        // Only add live scores for in-progress matches; completed matches have
+        // the final set already stored in m.sets, so adding m.scoreA/B again
+        // would double-count it.
+        if (!m.matchComplete) {
+            totalPointsA += m.scoreA || 0;
+            totalPointsB += m.scoreB || 0;
+        }
         if (m.matchComplete) {
             matches[s.team1Index]++;
             matches[s.team2Index]++;
