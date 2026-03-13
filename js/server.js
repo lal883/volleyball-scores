@@ -6,9 +6,12 @@ function setServer(matchId, teamKey, playerName) {
     if (!isScorer) return;
     var m = matchData[matchId]; if (!m) return;
 
+    var isSetStart = m.scoreA === 0 && m.scoreB === 0;
+    var noPointSincePick = m.serverSelectedAtRally !== undefined && m.rallyCounter === m.serverSelectedAtRally;
     var activeServerTeam = m.serverTeam;
     var activeServerPlayer = activeServerTeam === "A" ? m.serverPlayerA : m.serverPlayerB;
-    var canChangeServer = !!m.nextServerTeam;
+    // Allow change if: side-out pending, no point scored since pick, or score is 0-0
+    var canChangeServer = !!m.nextServerTeam || noPointSincePick || isSetStart;
     if (!canChangeServer && activeServerTeam && activeServerPlayer) {
         var isCurrentServer = activeServerTeam === teamKey && activeServerPlayer === playerName;
         if (!isCurrentServer) {
@@ -17,7 +20,8 @@ function setServer(matchId, teamKey, playerName) {
         }
     }
 
-    if (m.nextServerTeam && teamKey !== m.nextServerTeam) {
+    // Enforce nextServerTeam restriction only when not at set start
+    if (m.nextServerTeam && teamKey !== m.nextServerTeam && !isSetStart) {
         var requiredTeamName = m.nextServerTeam === "A" ? teams[m.team1Index].name : teams[m.team2Index].name;
         alert("Serve was just broken. Please pick the next server from " + requiredTeamName + ".");
         return;
@@ -35,8 +39,8 @@ function setServer(matchId, teamKey, playerName) {
     if (teamKey === "A") m.serverPlayerA = playerName;
     else m.serverPlayerB = playerName;
     m.nextServerTeam = null;
-
     m.serverReminder = "";
+    m.serverSelectedAtRally = m.rallyCounter;
 
     // Keep the court visualization in sync immediately when server is picked
     // from a court cell. Without this, the server slot highlight appears only
@@ -56,15 +60,25 @@ function getServeRemaining(m, teamKey, playerName) {
 
 function isServerSelectionAllowed(m, teamKey, playerName) {
     if (!m || !playerName) return false;
-    if (m.nextServerTeam && teamKey !== m.nextServerTeam) return false;
-    if (m.nextServerTeam && ((teamKey === "A" && m.serverPlayerA) || (teamKey === "B" && m.serverPlayerB))) return false;
+    var isSetStart = m.scoreA === 0 && m.scoreB === 0;
+    // At 0-0, any eligible player from either team may be selected
+    if (!isSetStart) {
+        if (m.nextServerTeam && teamKey !== m.nextServerTeam) return false;
+        if (m.nextServerTeam && ((teamKey === "A" && m.serverPlayerA) || (teamKey === "B" && m.serverPlayerB))) return false;
+    }
     return getServeRemaining(m, teamKey, playerName) === 0;
 }
 
 function shouldShowNextServerCandidates(m, teamKey) {
     if (!m) return false;
+    var isSetStart = m.scoreA === 0 && m.scoreB === 0;
+    var noPointSincePick = m.serverSelectedAtRally !== undefined && m.rallyCounter === m.serverSelectedAtRally;
+    // At 0-0, both teams are always eligible to show candidates
+    if (isSetStart) return true;
     if (m.nextServerTeam) return m.nextServerTeam === teamKey;
     if (!m.serverTeam) return true;
+    // After server picked but before first point: still show all eligible candidates
+    if (noPointSincePick) return true;
     var selected = teamKey === "A" ? m.serverPlayerA : m.serverPlayerB;
     return m.serverTeam === teamKey && !selected;
 }
@@ -130,11 +144,12 @@ function renderServerButtons(matchId) {
         return;
     }
 
+    var isSetStart = m.scoreA === 0 && m.scoreB === 0;
     if (containerA) {
         containerA.innerHTML = playersA.map(function (p) {
             var sid = "srv_" + matchId + "_A_" + safeId(p);
             var remaining = getServeRemaining(m, "A", p);
-            var blockedBySideOut = m.nextServerTeam && m.nextServerTeam !== "A";
+            var blockedBySideOut = !isSetStart && m.nextServerTeam && m.nextServerTeam !== "A";
             var title = remaining > 0
                 ? " title='" + remaining + " more player" + (remaining === 1 ? "" : "s") + " must serve before " + escHtml(p) + " can serve again'"
                 : (blockedBySideOut ? " title='Pick the next server from the other team first'" : "");
@@ -148,7 +163,7 @@ function renderServerButtons(matchId) {
         containerB.innerHTML = playersB.map(function (p) {
             var sid = "srv_" + matchId + "_B_" + safeId(p);
             var remaining = getServeRemaining(m, "B", p);
-            var blockedBySideOut = m.nextServerTeam && m.nextServerTeam !== "B";
+            var blockedBySideOut = !isSetStart && m.nextServerTeam && m.nextServerTeam !== "B";
             var title = remaining > 0
                 ? " title='" + remaining + " more player" + (remaining === 1 ? "" : "s") + " must serve before " + escHtml(p) + " can serve again'"
                 : (blockedBySideOut ? " title='Pick the next server from the other team first'" : "");
@@ -216,6 +231,7 @@ function logServiceEvent(matchId, scoringTeam) {
         scoringTeam: scoringTeam,
         scoreA: m.scoreA,
         scoreB: m.scoreB,
-        rally: m.rallyCounter
+        rally: m.rallyCounter,
+        set: m.currentSet || 1
     });
 }

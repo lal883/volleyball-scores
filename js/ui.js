@@ -58,7 +58,8 @@ function renderServiceLogTable(matchId) {
     var m = matchData[matchId]; if (!m) return;
     var container = document.getElementById("serviceLogTable_" + matchId);
     if (!container) return;
-    var log = m.serviceLog || [];
+    var currentSet = m.currentSet || 1;
+    var log = (m.serviceLog || []).filter(function (e) { return (e.set || 1) === currentSet; });
     if (!log.length) {
         container.innerHTML = "<div style='color:var(--text-dim);font-size:0.72rem;padding:4px;'>No serves recorded yet.</div>";
         return;

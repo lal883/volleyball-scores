@@ -41,6 +41,7 @@ function changeScore(matchId, teamKey, delta) {
             prevServerReminder: m.serverReminder || "",
             prevRecentServersA: (m.recentServersA || []).slice(),
             prevRecentServersB: (m.recentServersB || []).slice(),
+            prevServerSelectedAtRally: m.serverSelectedAtRally,
             prevRallyCounter: m.rallyCounter,
             prevCurrentSet: m.currentSet || 1,
             prevSetsWonA: m.setsWonA || 0,
@@ -117,6 +118,7 @@ function checkSetComplete(matchId) {
     m.serverReminder = "";
     m.recentServersA = [];
     m.recentServersB = [];
+    m.serverSelectedAtRally = undefined;
 }
 
 function undoLastPoint(matchId) {
@@ -137,6 +139,7 @@ function undoLastPoint(matchId) {
     m.serverReminder = last.prevServerReminder || "";
     m.recentServersA = last.prevRecentServersA || [];
     m.recentServersB = last.prevRecentServersB || [];
+    m.serverSelectedAtRally = last.prevServerSelectedAtRally;
     m.rallyCounter = last.prevRallyCounter;
     m.pendingSubLogA = null;
     m.pendingSubLogB = null;
