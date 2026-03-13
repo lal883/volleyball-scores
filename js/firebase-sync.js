@@ -9,6 +9,11 @@ var writeErrorState = false;
 var activeWriteToken = null;
 var activeWriteTimeout = null;
 
+function clearActiveWriteTimeout() {
+    if (activeWriteTimeout) clearTimeout(activeWriteTimeout);
+    activeWriteTimeout = null;
+}
+
 try {
     app = firebase.initializeApp(FIREBASE_CONFIG);
     db = firebase.database();
@@ -46,32 +51,33 @@ function saveToFirebase() {
     writeErrorState = false;
     setConnectionLabel("Syncing…", "connected");
 
-    if (activeWriteTimeout) clearTimeout(activeWriteTimeout);
+    clearActiveWriteTimeout();
     activeWriteTimeout = setTimeout(function () {
         if (activeWriteToken !== writeToken) return;
         pendingWrite = false;
         writeErrorState = true;
         localUpdate = false;
+        activeWriteToken = null;
         setConnectionLabel("Sync timeout", "disconnected");
     }, 8000);
 
     dbRef.set(state).then(function () {
         if (activeWriteToken !== writeToken) return;
-        if (activeWriteTimeout) clearTimeout(activeWriteTimeout);
-        activeWriteTimeout = null;
+        clearActiveWriteTimeout();
         lastWriteAckAt = Date.now();
         pendingWrite = false;
         writeErrorState = false;
         localUpdate = false;
+        activeWriteToken = null;
         setConnectionLabel("Synced", "connected");
     }).catch(function (err) {
         if (activeWriteToken !== writeToken) return;
-        if (activeWriteTimeout) clearTimeout(activeWriteTimeout);
-        activeWriteTimeout = null;
+        clearActiveWriteTimeout();
         console.error("Firebase write error:", err);
         pendingWrite = false;
         writeErrorState = true;
         localUpdate = false;
+        activeWriteToken = null;
         setConnectionLabel("Sync issue", "disconnected");
     });
 }
@@ -95,8 +101,8 @@ function loadFromFirebase() {
             lastWriteAckAt = Date.now();
             pendingWrite = false;
             localUpdate = false;
-            if (activeWriteTimeout) clearTimeout(activeWriteTimeout);
-            activeWriteTimeout = null;
+            clearActiveWriteTimeout();
+            activeWriteToken = null;
             setConnectionLabel("Synced", "connected");
         }
     });
