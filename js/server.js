@@ -10,7 +10,7 @@ function setServer(matchId, teamKey, playerName) {
     var activeServerPlayer = activeServerTeam === "A" ? m.serverPlayerA : m.serverPlayerB;
     var canChangeServer = !!m.nextServerTeam;
     if (!canChangeServer && activeServerTeam && activeServerPlayer &&
-        (teamKey !== activeServerTeam || playerName !== activeServerPlayer)) {
+        teamKey !== activeServerTeam) {
         alert("Server can only be changed after a side-out or if the current server is substituted.");
         return;
     }
@@ -48,6 +48,14 @@ function setServer(matchId, teamKey, playerName) {
 
     renderServerButtons(matchId);
     saveToFirebase();
+}
+
+function isServerSelectionAllowed(m, teamKey, playerName) {
+    if (!m || !playerName) return false;
+    if (m.nextServerTeam && teamKey !== m.nextServerTeam) return false;
+    if (m.nextServerTeam && ((teamKey === "A" && m.serverPlayerA) || (teamKey === "B" && m.serverPlayerB))) return false;
+    var cooldowns = teamKey === "A" ? (m.serverCooldownA || {}) : (m.serverCooldownB || {});
+    return (cooldowns[playerName] || 0) <= 0;
 }
 
 function renderServerReminder(matchId) {
@@ -129,7 +137,8 @@ function renderServerButtons(matchId) {
             var title = remaining > 0
                 ? " title='Wait " + remaining + " change(s)'"
                 : (blockedBySideOut ? " title='Pick the next server from the other team first'" : "");
-            var classes = "player-btn" + (remaining > 0 ? " cooling-down" : "") + (blockedBySideOut ? " cooling-down" : "");
+            var isCandidate = isServerSelectionAllowed(m, "A", p);
+            var classes = "player-btn" + (remaining > 0 ? " cooling-down" : "") + (blockedBySideOut ? " cooling-down" : "") + (isCandidate ? " next-server-candidate" : "");
             return "<span id='" + sid + "' class='" + classes + "'" + title + " onclick=\"setServer('" + matchId + "','A','" + escJs(p) + "')\">" + escHtml(p) + "</span>";
         }).join("");
     }
@@ -141,7 +150,8 @@ function renderServerButtons(matchId) {
             var title = remaining > 0
                 ? " title='Wait " + remaining + " change(s)'"
                 : (blockedBySideOut ? " title='Pick the next server from the other team first'" : "");
-            var classes = "player-btn" + (remaining > 0 ? " cooling-down" : "") + (blockedBySideOut ? " cooling-down" : "");
+            var isCandidate = isServerSelectionAllowed(m, "B", p);
+            var classes = "player-btn" + (remaining > 0 ? " cooling-down" : "") + (blockedBySideOut ? " cooling-down" : "") + (isCandidate ? " next-server-candidate" : "");
             return "<span id='" + sid + "' class='" + classes + "'" + title + " onclick=\"setServer('" + matchId + "','B','" + escJs(p) + "')\">" + escHtml(p) + "</span>";
         }).join("");
     }
@@ -159,11 +169,11 @@ function highlightServerButton(matchId) {
 
     pA.forEach(function (p) {
         var el = document.getElementById("srv_" + matchId + "_A_" + safeId(p));
-        if (el) el.classList.remove("server-highlight", "next-server-candidate");
+        if (el) el.classList.remove("server-highlight");
     });
     pB.forEach(function (p) {
         var el = document.getElementById("srv_" + matchId + "_B_" + safeId(p));
-        if (el) el.classList.remove("server-highlight", "next-server-candidate");
+        if (el) el.classList.remove("server-highlight");
     });
 
     if (m.serverPlayerA) {
@@ -175,16 +185,14 @@ function highlightServerButton(matchId) {
         if (elB) elB.classList.add("server-highlight");
     }
 
-    var pendingTeam = m.nextServerTeam;
-    if (pendingTeam && !((pendingTeam === "A" && m.serverPlayerA) || (pendingTeam === "B" && m.serverPlayerB))) {
-        var pendingPlayers = pendingTeam === "A" ? pA : pB;
-        var cooldowns = pendingTeam === "A" ? (m.serverCooldownA || {}) : (m.serverCooldownB || {});
-        pendingPlayers.forEach(function (p) {
-            if ((cooldowns[p] || 0) > 0) return;
-            var el = document.getElementById("srv_" + matchId + "_" + pendingTeam + "_" + safeId(p));
-            if (el) el.classList.add("next-server-candidate");
-        });
-    }
+    pA.forEach(function (p) {
+        var el = document.getElementById("srv_" + matchId + "_A_" + safeId(p));
+        if (el && isServerSelectionAllowed(m, "A", p)) el.classList.add("next-server-candidate");
+    });
+    pB.forEach(function (p) {
+        var el = document.getElementById("srv_" + matchId + "_B_" + safeId(p));
+        if (el && isServerSelectionAllowed(m, "B", p)) el.classList.add("next-server-candidate");
+    });
 }
 
 function logServiceEvent(matchId, scoringTeam) {
