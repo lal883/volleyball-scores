@@ -45,10 +45,7 @@ function getCooldownText(m, teamKey, playerName) {
 }
 
 function isNextServerCandidate(m, teamKey, playerName) {
-    var pendingTeam = m.nextServerTeam;
-    if (!pendingTeam || pendingTeam !== teamKey) return false;
-    if ((teamKey === "A" && m.serverPlayerA) || (teamKey === "B" && m.serverPlayerB)) return false;
-    return getCooldownRemaining(m, teamKey, playerName) <= 0;
+    return isServerSelectionAllowed(m, teamKey, playerName);
 }
 
 function renderRefereeView() {
