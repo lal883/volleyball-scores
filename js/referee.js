@@ -132,7 +132,7 @@ function renderRefereeView() {
 
     function teamSubSummary(teamKey) {
         return (m.serviceLog || []).filter(function (evt) {
-            return evt.eventType === "sub" && evt.teamKey === teamKey && (evt.set || 1) === currentSet;
+            return evt.eventType === "sub" && evt.teamKey === teamKey;
         });
     }
 
